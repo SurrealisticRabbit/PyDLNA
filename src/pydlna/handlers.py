@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 _CHUNK = 64 * 1024
 
 
-class DLNARequestHandler(BaseHTTPRequestHandler):
+class DLNA_RequestHandler(BaseHTTPRequestHandler):
     """Routes HTTP requests to the services and media of a ``DLNAServer``."""
 
     server_version = "PyDLNA/0.1"

@@ -7,7 +7,7 @@ import socket
 import threading
 import time
 
-from pydlna.client import DLNAClient
+from pydlna.client import DLNA_Client
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ _SERVER_HEADER = "PyDLNA/0.1 UPnP/1.0 DLNADOC/1.50"
 class DeviceList(list):
     """The result of a discovery run; usable as a context manager.
 
-    ``with DLNADiscovery().discover() as devices:`` works purely for
+    ``with DLNA_Discovery().discover() as devices:`` works purely for
     symmetry with the server/controller — there is nothing to close.
     """
 
@@ -34,17 +34,17 @@ class DeviceList(list):
         pass
 
 
-class DLNADiscovery:
+class DLNA_Discovery:
     """Finds DLNA/UPnP devices on the local network via SSDP M-SEARCH."""
 
     def __init__(self, st: str = "ssdp:all") -> None:
         self.st = st
-        self.clients: list[DLNAClient] = []
+        self.clients: list[DLNA_Client] = []
 
-    def discover(self, timeout: float = 3.0, resolve_names: bool = True) -> list[DLNAClient]:
+    def discover(self, timeout: float = 3.0, resolve_names: bool = True) -> list[DLNA_Client]:
         """Send an M-SEARCH multicast and collect the devices that answer."""
         request = _msearch(self.st, mx=max(1, min(int(timeout), 5)))
-        found: dict[str, DLNAClient] = {}
+        found: dict[str, DLNA_Client] = {}
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         try:
             sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
@@ -62,7 +62,7 @@ class DLNADiscovery:
                 key = usn.split("::")[0]
                 if not key or key in found:
                     continue
-                found[key] = DLNAClient.from_ssdp(address[0], headers)
+                found[key] = DLNA_Client.from_ssdp(address[0], headers)
         finally:
             sock.close()
         self.clients = DeviceList(found.values())

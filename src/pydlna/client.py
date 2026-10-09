@@ -41,7 +41,7 @@ class PlaybackPosition:
 
 
 @dataclass
-class DLNAClient:
+class DLNA_Client:
     """A DLNA/UPnP device discovered on the network."""
 
     name: str = ""
@@ -64,7 +64,7 @@ class DLNAClient:
     _protocol_cache: Optional[dict] = field(default=None, repr=False)
 
     @classmethod
-    def from_ssdp(cls, address: str, headers: Mapping[str, str]) -> "DLNAClient":
+    def from_ssdp(cls, address: str, headers: Mapping[str, str]) -> "DLNA_Client":
         """Build a client from the sender address and headers of an SSDP message."""
         return cls(
             address=address,
@@ -148,17 +148,17 @@ class DLNAClient:
         """Resolve a possibly-relative URL against the description location."""
         return urljoin(self.location, url) if url else ""
 
-    def controller(self) -> "DLNAController":
-        return DLNAController(self)
+    def controller(self) -> "DLNA_Controller":
+        return DLNA_Controller(self)
 
 
-class DLNAController:
+class DLNA_Controller:
     """A UPnP control point: calls SOAP actions on a ``DLNAClient``."""
 
-    def __init__(self, client: Optional[DLNAClient] = None) -> None:
-        self.client = client or DLNAClient()
+    def __init__(self, client: Optional[DLNA_Client] = None) -> None:
+        self.client = client or DLNA_Client()
 
-    def __enter__(self) -> "DLNAController":
+    def __enter__(self) -> "DLNA_Controller":
         """The controller doubles as a ``with`` session for readability."""
         return self
 
