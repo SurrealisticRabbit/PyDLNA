@@ -8,3 +8,4 @@ dist/
 *.egg-info/
 .pytest_cache/
 .vscode/
+src/pydlna/_version.py
