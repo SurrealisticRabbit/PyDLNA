@@ -4,14 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pydlna"
-version = "0.1.0"
-description = ""
+version = "0.1.3"
+description = "a simple dlna library for python"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = []
-
-[project.scripts]
-pydlna = "pydlna.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
