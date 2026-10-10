@@ -1,34 +1,26 @@
-"""Serve a folder of media over DLNA and play it on the first renderer found.
+"""Serve folder media and play first file on first DLNA renderer.
 
 Usage:
     python examples/basic.py [folder]
 """
 
-import time
-from pydlna import DLNADiscovery, DLNAServer
+from pathlib import Path
+from pydlna import DLNA_Discovery, DLNA_Server
 
-folder = "D:/Movies"
+folder = Path("D:/Movies")
 
-with DLNAServer(name="PyDLNA Example") as server:
-    server.library.add_directory(folder)
+with DLNA_Server() as server:
+    added = server.library.add_directory(folder)
+    if not added:
+        raise RuntimeError(f"No media files found in {folder}")
 
-    target = None
-    with DLNADiscovery().discover() as devices:
-        for device in devices:
-            if device.is_renderer:
-                print(f"Found renderer: {device.name}")
-                target = device
-                break
+    renderer = next(
+        (device for device in DLNA_Discovery().discover() if device.is_renderer),
+        None,
+    )
+    if renderer is None:
+        raise RuntimeError("No DLNA renderer found")
 
-    if target is None:
-        print("No renderer found.")
-    else:
-        with target.controller() as session:
-            media = server.library[0]
-            print(f"Sending: {media.url_for(target.address)}")
-            session.play(media)
-
-            while session.is_playing():
-                current = session.currently_playing
-                print(f"Playing: {server.library[0].title[:18]}> {current.position}:{current.duration}", end="\r")
-                time.sleep(1)
+    media = server.library[0]
+    renderer.controller().play(media)
+    print(f"Playing {media.title} on {renderer.name}")

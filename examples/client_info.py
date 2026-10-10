@@ -1,14 +1,16 @@
-"""Show what PyDLNA can see about renderer clients on the network.
+"""List DLNA renderers found on local network.
 
-Run:  python examples/client_info.py
+Usage:
+    python examples/client_info.py
 """
 
-from pydlna import DLNADiscovery
+from pydlna import DLNA_Discovery
 
-for client in DLNADiscovery().discover():
-    if client.is_renderer:
-        print(f"{client.name or '(unnamed)'}  @  {client.address}")
-        print(f"  Manufacturer    : {client.manufacturer}  {client.manufacturer_url}")
-        print(f"  Model           : {client.model_name}  {client.model_number}")
-        print(f"  Playable formats: {client.playback_formats}")
-        print(f"  Supported protocols: {client.supported_protocols}")
+renderers = [device for device in DLNA_Discovery().discover() if device.is_renderer]
+if not renderers:
+    print("No DLNA renderers found.")
+
+for renderer in renderers:
+    print(f"{renderer.name or '(unnamed)'} at {renderer.address}")
+    if renderer.model_name:
+        print(f"  {renderer.manufacturer} {renderer.model_name}")

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import mimetypes
 import socket
 import threading
 import uuid
@@ -12,9 +11,9 @@ from pathlib import Path
 from typing import Iterator, Optional, Union
 
 from pydlna.discovery import SSDPResponder
-from pydlna.file import MediaFile
+from pydlna.file import MediaFile, detect_mime_type
 from pydlna.formatters import XMLFormatter
-from pydlna.handlers import DLNARequestHandler
+from pydlna.handlers import DLNA_RequestHandler
 from pydlna.services import ConnectionManagerService, ContentDirectoryService
 
 logger = logging.getLogger(__name__)
@@ -25,7 +24,7 @@ _MEDIA_TOP_TYPES = ("audio", "video", "image")
 class MediaLibrary:
     """A flat collection of media files, each with a stable DLNA object id."""
 
-    def __init__(self, server: Optional["DLNAServer"] = None) -> None:
+    def __init__(self, server: Optional["DLNA_Server"] = None) -> None:
         self.server = server
         self._items: dict[str, MediaFile] = {}
 
@@ -45,7 +44,7 @@ class MediaLibrary:
         for path in sorted(root.glob(pattern)):
             if not path.is_file():
                 continue
-            mime_type = mimetypes.guess_type(path.name)[0] or ""
+            mime_type = detect_mime_type(path)
             if mime_type.split("/", 1)[0] in _MEDIA_TOP_TYPES:
                 self.add(path)
                 added += 1
@@ -68,7 +67,7 @@ class MediaLibrary:
         return iter(self._items.values())
 
 
-class DLNAServer:
+class DLNA_Server:
     """A DLNA Digital Media Server.
 
     Serves device/service descriptions and media bytes over HTTP, answers
@@ -87,7 +86,7 @@ class DLNAServer:
         self._httpd: Optional[ThreadingHTTPServer] = None
         self._ssdp: Optional[SSDPResponder] = None
 
-    def __enter__(self) -> "DLNAServer":
+    def __enter__(self) -> "DLNA_Server":
         """Start the server; usable as ``with DLNAServer(...) as server:``."""
         self.start()
         return self
@@ -135,7 +134,7 @@ class DLNAServer:
         """Start the HTTP server (and SSDP advertisements) in the background."""
         if self._httpd is not None:
             return
-        self._httpd = ThreadingHTTPServer((self.host, self.port), DLNARequestHandler)
+        self._httpd = ThreadingHTTPServer((self.host, self.port), DLNA_RequestHandler)
         self._httpd.daemon_threads = True
         self._httpd.app = self  # type: ignore[attr-defined]
         self.port = self._httpd.server_address[1]  # resolves port=0

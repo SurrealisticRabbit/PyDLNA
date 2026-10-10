@@ -10,19 +10,31 @@ from typing import TYPE_CHECKING, Optional
 if TYPE_CHECKING:
     from pydlna.server import MediaLibrary
 
-# Best-effort DLNA profile names keyed by MIME type. Anything not listed is
-# advertised with a wildcard profile, which most renderers still accept.
-_DLNA_PROFILES = {
-    "audio/mpeg": "MP3",
-    "audio/mp4": "AAC_ISO",
-    "audio/x-m4a": "AAC_ISO",
-    "audio/wav": "LPCM",
-    "audio/x-wav": "LPCM",
-    "image/jpeg": "JPEG_LRG",
-    "image/png": "PNG_LRG",
-    "video/mp4": "AVC_MP4_MP_HD_720p_AAC",
-    "video/mpeg": "MPEG_PS_PAL",
+_MIME_BY_EXTENSION = {
+    ".aac": "audio/aac",
+    ".flac": "audio/flac",
+    ".m4a": "audio/mp4",
+    ".mka": "audio/x-matroska",
+    ".mkv": "video/x-matroska",
+    ".mp3": "audio/mpeg",
+    ".mp4": "video/mp4",
+    ".mpeg": "video/mpeg",
+    ".mpg": "video/mpeg",
+    ".oga": "audio/ogg",
+    ".ogg": "audio/ogg",
+    ".ogv": "video/ogg",
+    ".opus": "audio/opus",
+    ".wav": "audio/wav",
+    ".webm": "video/webm",
+    ".wma": "audio/x-ms-wma",
+    ".wmv": "video/x-ms-wmv",
 }
+
+
+def detect_mime_type(path: Path) -> str:
+    """Return a stable media MIME type from host data or a known extension."""
+    guessed = mimetypes.guess_type(path.name)[0]
+    return guessed or _MIME_BY_EXTENSION.get(path.suffix.lower(), "application/octet-stream")
 
 
 @dataclass
@@ -40,7 +52,7 @@ class MediaFile:
         if self.title is None:
             self.title = self.path.stem
         if self.mime_type is None:
-            self.mime_type = mimetypes.guess_type(self.path.name)[0] or "application/octet-stream"
+            self.mime_type = detect_mime_type(self.path)
 
     @property
     def size(self) -> int:
@@ -49,9 +61,6 @@ class MediaFile:
         except OSError:
             return 0
 
-    @property
-    def dlna_profile(self) -> str:
-        return _DLNA_PROFILES.get(self.mime_type or "", "*")
 
     @property
     def upnp_class(self) -> str:
@@ -64,9 +73,24 @@ class MediaFile:
 
     @property
     def protocol_info(self) -> str:
-        """The ``protocolInfo`` attribute used in DIDL-Lite ``<res>`` elements."""
-        profile = f"DLNA.ORG_PN={self.dlna_profile};" if self.dlna_profile != "*" else ""
-        return f"http-get:*:{self.mime_type}:{profile}DLNA.ORG_OP=01;DLNA.ORG_CI=0"
+        """Conservative ``protocolInfo`` for this file's DIDL-Lite resource."""
+        return f"http-get:*:{self.mime_type}:DLNA.ORG_OP=01;DLNA.ORG_CI=0"
+
+    def compatibility_with(self, renderer: object) -> "MediaCompatibility":
+        """Return this file's compatibility with a renderer's Sink capabilities."""
+        from pydlna.protocol import MediaCompatibility, ProtocolInfo
+
+        protocols = getattr(renderer, "supported_protocols", ())
+        candidates = [ProtocolInfo.parse(value) for value in protocols]
+        candidates = [candidate for candidate in candidates if candidate is not None]
+        if not candidates:
+            return MediaCompatibility.unknown()
+        source = ProtocolInfo.parse(self.protocol_info)
+        if source is None:
+            return MediaCompatibility.unsupported("invalid media protocol information")
+        if any(candidate.matches(source) for candidate in candidates):
+            return MediaCompatibility.supported()
+        return MediaCompatibility.unsupported("renderer Sink does not accept this protocol information")
 
     @property
     def url(self) -> str:
