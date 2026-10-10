@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 import uuid
 from http.server import BaseHTTPRequestHandler
+from typing import Optional, Tuple
 from urllib.parse import urlsplit
 from xml.etree.ElementTree import ParseError
 
@@ -130,8 +131,15 @@ class DLNA_RequestHandler(BaseHTTPRequestHandler):
         except OSError:
             self.send_error(404, "Not Found")
             return
-        start, end, status = self._resolve_range(size)
-        length = max(0, end - start + 1)
+        range_result = self._resolve_range(size)
+        if range_result is None:
+            self.send_response(416)
+            self.send_header("Content-Range", f"bytes */{size}")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        start, end, status = range_result
+        length = end - start + 1
         self.send_response(status)
         self.send_header("Content-Type", media.mime_type or "application/octet-stream")
         self.send_header("Content-Length", str(length))
@@ -156,19 +164,29 @@ class DLNA_RequestHandler(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             pass  # The renderer wandered off mid-stream; nothing to fix.
 
-    def _resolve_range(self, size: int) -> tuple[int, int, int]:
-        """Translate a ``Range`` header into ``(start, end, http_status)``."""
+    def _resolve_range(self, size: int) -> Optional[Tuple[int, int, int]]:
+        """Translate ``Range`` header into ``(start, end, status)`` or ``416``."""
         header = self.headers.get("Range", "")
-        if header.startswith("bytes="):
-            first, _, last = header[6:].split(",", 1)[0].partition("-")
-            try:
-                if first:
-                    start = int(first)
-                    end = min(int(last), size - 1) if last else size - 1
-                else:  # Suffix range: the last N bytes.
-                    start, end = max(0, size - int(last)), size - 1
-                if 0 <= start <= end:
-                    return start, end, 206
-            except ValueError:
-                pass
-        return 0, size - 1, 200
+        if not header:
+            return (0, size - 1, 200) if size else None
+        if not header.startswith("bytes="):
+            return None
+        first, separator, last = header[6:].split(",", 1)[0].partition("-")
+        if not separator:
+            return None
+        try:
+            if first:
+                start = int(first)
+                end = min(int(last), size - 1) if last else size - 1
+            elif last:
+                suffix = int(last)
+                if suffix <= 0:
+                    return None
+                start, end = max(0, size - suffix), size - 1
+            else:
+                return None
+        except ValueError:
+            return None
+        if 0 <= start <= end < size:
+            return start, end, 206
+        return None

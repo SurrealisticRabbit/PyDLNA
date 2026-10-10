@@ -13,11 +13,23 @@ pip install PyDLNA
 
 ## Quick Concepts
 
-* **`DLNADiscovery()`** — Your best friend for finding DLNA devices (renderers, media servers, etc.) on your local network.
-* **`DLNAServer()`** — Hosts and serves your local media files over HTTP with proper DLNA headers.
-* **`device.controller()`** — Gives you an active playback control session (`.play()`, `.pause()`, track info) for a specific renderer.
+* **`DLNA_Discovery()`** — Finds DLNA devices (renderers, media servers) on local network.
+* **`DLNA_Server()`** — Hosts and serves local media files over HTTP with DLNA headers.
+* **`device.controller()`** — Gives active playback control session (`.play()`, `.pause()`, track info) for a renderer.
 
 ---
+
+## Renderer Compatibility
+
+`MediaFile.compatibility_with(renderer)` compares source `protocolInfo` against renderer ConnectionManager Sink entries. Result status is `supported`, `unsupported`, or `unknown`; `unknown` allows playback attempt because many renderers omit usable Sink data.
+
+```python
+result = media.compatibility_with(target)
+if result.can_play:
+    session.play(media)
+```
+
+MIME detection uses host MIME data plus common media-extension fallbacks. It does not inspect codecs, resolution, audio tracks, or containers beyond file extension. PyDLNA does not claim a DLNA profile from MIME type alone, because that can falsely advertise codec compatibility.
 
 ## Usage Examples
 
@@ -27,15 +39,15 @@ Serve a directory, find a smart TV or speaker on the network, and throw a video/
 
 ```python
 import time
-from pydlna import DLNADiscovery, DLNAServer
+from pydlna import DLNA_Discovery, DLNA_Server
 
 folder = "D:/Movies"
 
-with DLNAServer(name="PyDLNA Example") as server:
+with DLNA_Server(name="PyDLNA Example") as server:
     server.library.add_directory(folder)
 
     target = None
-    with DLNADiscovery().discover() as devices:
+    with DLNA_Discovery().discover() as devices:
         for device in devices:
             if device.is_renderer:
                 print(f"Found renderer: {device.name}")
@@ -64,9 +76,9 @@ with DLNAServer(name="PyDLNA Example") as server:
 Scan your network and inspect the hardware, model numbers, and supported playback formats of discovered renderers:
 
 ```python
-from pydlna import DLNADiscovery
+from pydlna import DLNA_Discovery
 
-for client in DLNADiscovery().discover():
+for client in DLNA_Discovery().discover():
     if client.is_renderer:
         print(f"{client.name or '(unnamed)'}  @  {client.address}")
         print(f"  Manufacturer       : {client.manufacturer} ({client.manufacturer_url})")

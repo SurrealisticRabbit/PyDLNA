@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import mimetypes
 import socket
 import threading
 import uuid
@@ -12,7 +11,7 @@ from pathlib import Path
 from typing import Iterator, Optional, Union
 
 from pydlna.discovery import SSDPResponder
-from pydlna.file import MediaFile
+from pydlna.file import MediaFile, detect_mime_type
 from pydlna.formatters import XMLFormatter
 from pydlna.handlers import DLNA_RequestHandler
 from pydlna.services import ConnectionManagerService, ContentDirectoryService
@@ -45,7 +44,7 @@ class MediaLibrary:
         for path in sorted(root.glob(pattern)):
             if not path.is_file():
                 continue
-            mime_type = mimetypes.guess_type(path.name)[0] or ""
+            mime_type = detect_mime_type(path)
             if mime_type.split("/", 1)[0] in _MEDIA_TOP_TYPES:
                 self.add(path)
                 added += 1
